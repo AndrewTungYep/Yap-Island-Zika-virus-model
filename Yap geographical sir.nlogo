@@ -1,6 +1,6 @@
 extensions [gis]
-globals [yap areas poplist popcount plist clist p k a b Shg Ehg Ihg Rhg Smg Emg Img Shx Ehx Ihx Rhx Smx Emx Imx]
-patches-own [landtype Sh Eh Ih Rh Sm Em Im hpop mpop mlist area popc]
+globals [yap areas poplist popcount plist clist p k a b  nbleedh nbleedm Shg Ehg Ihg Rhg Smg Emg Img Shx Ehx Ihx Rhx Smx Emx Imx]
+patches-own [landtype Sh Eh Ih Rh Sm Em Im hpop mpop area popc]
 
 to setup
   clear-all
@@ -30,8 +30,8 @@ to setup
 end
 
 to go
-  ask patches [set hpop Sh + Eh + Ih + Rh
-    set mpop Sm + Em + Im]
+  ;ask patches [set hpop Sh + Eh + Ih + Rh
+    ;set mpop Sm + Em + Im]
   infect
   bleed
   ask patches [if-else vegetation [set pcolor landtype * 6]
@@ -67,7 +67,9 @@ to infect
         set Im Im + develm
         set Sm Sm - binom (Sm) (mosdeath) + binom (Sm + Em + Im) (mosdeath)
         set Em Em - binom (Em) (mosdeath)
-        set Im Im - binom (Im) (mosdeath)]]
+        set Im Im - binom (Im) (mosdeath)
+        set mpop Sm + Em + Im
+        set hpop Sh + Eh + Ih + Rh]]
 end
 
 to bleed
@@ -78,21 +80,22 @@ to bleed
     let Smb binom (Sm) (pbleedm)
     let Emb binom (Em) (pbleedm)
     let Imb binom (Im) (pbleedm)
-    let nbleedh (Shb + Ehb + Ihb + Rhb)
-    let nbleedm (Smb + Emb + Imb)
+    set nbleedh (Shb + Ehb + Ihb + Rhb)
+    set nbleedm (Smb + Emb + Imb)
     set a 0
     set b 0
     let swap 0
     ask turtle 0 [set pcolor green
       move-to myself
       right random 360
-      let dis random-exponential 5
+      let dis random-exponential ln(2)
       if not can-move? dis [set xcor 0
         set ycor 0]
       forward dis
       set a xcor
       set b ycor
-    ask patch-here [if area < 15 and hpop >= [nbleedh] of myself and mpop >= [nbleedm] of myself [let Shl n-values Sh [1]
+    ask patch-here [if area < 15 and hpop >= nbleedh and mpop >= nbleedm [let Shl n-values Sh [1]
+        ;show [nbleedh] of myself
         let Ehl n-values Eh [2]
         let Ihl n-values Ih [3]
         let Rhl n-values Rh [4]
@@ -100,7 +103,7 @@ to bleed
         let Eml n-values Em [2]
         let Iml n-values Im [3]
         let hlist (sentence Shl Ehl Ihl Rhl)
-        set mlist (sentence Sml Eml Iml)
+        let mlist (sentence Sml Eml Iml)
         set hlist n-of nbleedh hlist
         set mlist n-of nbleedm mlist
         set Shx filter [? = 1] hlist

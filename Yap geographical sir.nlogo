@@ -1,6 +1,7 @@
 extensions [gis]
-globals [yap areas poplist popcount plist clist p k a b  nbleedh nbleedm Shg Ehg Ihg Rhg Smg Emg Img Shx Ehx Ihx Rhx Smx Emx Imx]
+globals [yap areas poplist popcount plist clist p k mos nbleedh nbleedm Shg Ehg Ihg Rhg Smg Emg Img Shx Ehx Ihx Rhx Smx Emx Imx Shb Ehb Ihb Rhb Smb Emb Imb]
 patches-own [landtype Sh Eh Ih Rh Sm Em Im hpop mpop area popc]
+breed [settlements settlement]
 
 to setup
   clear-all
@@ -12,11 +13,14 @@ to setup
   gis:apply-raster areas area
   ask patches [if-else vegetation [set pcolor landtype * 6]
       [set pcolor area * 7]
-      set Sm 58
+      set Sm 5
+      if member? area [3 5 12] [set Sm 25]
+      if area = 13 [set Sm 75]
       if area = 0 [set area 15
         set Sm 0]]
   set-pop
-  ask patch 67 71 [set Ih 100]
+  create-nodes
+  ask patch 71 82 [set Ih 100]
   ;set clist n-values 15 [0]
   ;set plist n-values 15 [0]
   ;ask patches [set popcount popcount + Sh
@@ -26,16 +30,31 @@ to setup
   ;show clist
   ;show plist
   ;show [270 1022 641 0 0 0 1192 2023 124 0 730 551 236 596 0]
-  crt 1
 end
 
 to go
-  ;ask patches [set hpop Sh + Eh + Ih + Rh
-    ;set mpop Sm + Em + Im]
+  ask patches [set mpop Sm + Em + Im
+    set hpop Sh + Eh + Ih + Rh]
   infect
+  mospawn
+  nodebleed
   bleed
+  set Shg 0
+  set Ehg 0
+  set Ihg 0
+  set Rhg 0
+  set Smg 0
+  set Emg 0
+  set Img 0
   ask patches [if-else vegetation [set pcolor landtype * 6]
-      [set pcolor Ih * 7.16]] ;area * 7]]
+      [set pcolor Im * 3]
+    if Sh >= 0 [set Shg Shg + Sh
+      set Ehg Ehg + Eh
+      set Ihg Ihg + Ih
+      set Rhg Rhg + Rh
+      set Smg Smg + Sm
+      set Emg Emg + Em
+      set Img Img + Im]]
   tick
 end
 
@@ -44,16 +63,27 @@ to set-pop
   set poplist replace-item 14 poplist 1
   foreach [1 2 3 7 8 9 11 12 13 14][ask patches[if area = ? [set poplist replace-item (? - 1) poplist ((item (? - 1) poplist) + 1)
         set popc popc + 1
-      if member? landtype [3 5 12 13] [set poplist replace-item (? - 1) poplist ((item (? - 1) poplist) + 10)
-        set popc popc + 10]
-      if landtype = 13 [set poplist replace-item (? - 1) poplist ((item (? - 1) poplist) + 10)
-        set popc popc + 10]]]]
+        if member? landtype [3 5 12 13] [set poplist replace-item (? - 1) poplist ((item (? - 1) poplist) + 10)
+          set popc popc + 10]
+        if landtype = 13 [set poplist replace-item (? - 1) poplist ((item (? - 1) poplist) + 10)
+          set popc popc + 10]]]]
   ask patches[set Sh poisson(popc * (item (area - 1) [270 1022 641 0 0 0 1192 2023 124 0 730 551 236 596 0]) / (item (area - 1) poplist))
-    set pcolor Sh + Ih]
+    ;set pcolor Sh + Ih
+    ]
+end
+
+to create-nodes
+  foreach n-values 17 [?] [let x item ? [73 52 50 31 36 44 79 121 108 99 122 146 119 134 128 9 8]
+    let y item ? [83 80 66 61 88 111 116 115 93 84 100 117 177 167 192 22 2]
+    ask patch x y [sprout 1]]
+  ask turtles [set breed settlements]
+  foreach n-values 22 [?] [let S1 item ? [0 1 4 5 1 2 3 15 2 0 0 6 6 7 7 8 8 7 7 12 12 13]
+      let S2 item ? [1 4 5 6 2 3 15 16 15 6 5 7 8 8 10 10 9 11 12 13 14 14]
+      ask settlement S1 [create-link-with settlement S2]]
 end
 
 to infect
-  ask patches [if Sh > 0 [let expos binom (Sh) (Bh * Im)
+  ask patches [if hpop > 0[let expos binom (Sh) (Bh * Im)
         let devel binom (Eh) (Ah)
         let recov binom (Ih) (Ch)
         let exposm binom (Sm) (Bm * Ih)
@@ -64,79 +94,138 @@ to infect
         set Rh Rh + recov
         set Sm Sm - exposm
         set Em Em + exposm - develm
-        set Im Im + develm
-        set Sm Sm - binom (Sm) (mosdeath) + binom (Sm + Em + Im) (mosdeath)
-        set Em Em - binom (Em) (mosdeath)
-        set Im Im - binom (Im) (mosdeath)
-        set mpop Sm + Em + Im
-        set hpop Sh + Eh + Ih + Rh]]
+        set Im Im + develm]]
+end
+
+to mospawn
+  ask patches [let Smd binom (Sm) (mosdeath)
+    let Emd binom (Em) (mosdeath)
+    let Imd binom (Im) (mosdeath)
+    set Sm Sm - Smd
+    set Em Em - Emd
+    set Im Im - Imd
+    set mos mos + Smd + Emd + Imd]
+  ask patches with [member? landtype [3 5 12 13]] [set Sm Sm + int(mos / 3507)
+    if landtype = 13 [set Sm Sm + int(mos / 3507) * 2]
+    set mos mos - int(mos / 3507)]
+  while [mos > 0] [ ask one-of patches with [member? landtype [3 5 12 13]] [set Sm Sm + 1
+      set mos mos - 1]]
+  ask patches [set mpop Sm + Em + Im
+    set hpop Sh + Eh + Ih + Rh]
+end
+
+to nodebleed
+  ask links [ifelse [hpop] of end1 >= [hpop] of end2 [ask end2 [ask patch-here[set Shb binom (Sh) (pbleedh)
+          set Ehb binom (Eh) (pbleedh)
+          set Ihb binom (Ih) (pbleedh)
+          set Rhb binom (Rh) (pbleedh)
+          set nbleedh (Shb + Ehb + Ihb + Rhb)]]
+      ask end1 [ask patch-here [let Shl n-values Sh [1]
+          let Ehl n-values Eh [2]
+          let Ihl n-values Ih [3]
+          let Rhl n-values Rh [4]
+          let hlist (sentence Shl Ehl Ihl Rhl)
+          set hlist n-of nbleedh hlist
+          set Shx filter [? = 1] hlist
+          set Shx length Shx
+          set Ehx filter [? = 2] hlist
+          set Ehx length Ehx
+          set Ihx filter [? = 3] hlist
+          set Ihx length Ihx
+          set Rhx filter [? = 4] hlist
+          set Rhx length Rhx
+          set Sh Sh + Shb - Shx
+          set Eh Eh + Ehb - Ehx
+          set Ih Ih + Ihb - Ihx
+          set Rh Rh + Rhb - Rhx]]
+      ask end2 [ask patch-here[set Sh Sh - Shb + Shx
+          set Eh Eh - Ehb + Ehx
+          set Ih Ih - Ihb + Ihx
+          set Rh Rh - Rhb + Rhx]]]
+      [ask end1 [ask patch-here[set Shb binom (Sh) (pbleedh)
+          set Ehb binom (Eh) (pbleedh)
+          set Ihb binom (Ih) (pbleedh)
+          set Rhb binom (Rh) (pbleedh)
+          set nbleedh (Shb + Ehb + Ihb + Rhb)]]
+      ask end2 [ask patch-here [let Shl n-values Sh [1]
+          let Ehl n-values Eh [2]
+          let Ihl n-values Ih [3]
+          let Rhl n-values Rh [4]
+          let hlist (sentence Shl Ehl Ihl Rhl)
+          set hlist n-of nbleedh hlist
+          set Shx filter [? = 1] hlist
+          set Shx length Shx
+          set Ehx filter [? = 2] hlist
+          set Ehx length Ehx
+          set Ihx filter [? = 3] hlist
+          set Ihx length Ihx
+          set Rhx filter [? = 4] hlist
+          set Rhx length Rhx
+          set Sh Sh + Shb - Shx
+          set Eh Eh + Ehb - Ehx
+          set Ih Ih + Ihb - Ihx
+          set Rh Rh + Rhb - Rhx]]
+      ask end1 [ask patch-here[set Sh Sh - Shb + Shx
+          set Eh Eh - Ehb + Ehx
+          set Ih Ih - Ihb + Ihx
+          set Rh Rh - Rhb + Rhx]]]]
 end
 
 to bleed
-  ask patches [if (hpop + mpop > 0) and area < 15 [let Shb binom (Sh) (pbleedh)
-    let Ehb binom (Eh) (pbleedh)
-    let Ihb binom (Ih) (pbleedh)
-    let Rhb binom (Rh) (pbleedh)
-    let Smb binom (Sm) (pbleedm)
-    let Emb binom (Em) (pbleedm)
-    let Imb binom (Im) (pbleedm)
-    set nbleedh (Shb + Ehb + Ihb + Rhb)
-    set nbleedm (Smb + Emb + Imb)
-    set a 0
-    set b 0
-    let swap 0
-    ask turtle 0 [set pcolor green
-      move-to myself
-      right random 360
-      let dis random-exponential ln(2)
-      if not can-move? dis [set xcor 0
-        set ycor 0]
-      forward dis
-      set a xcor
-      set b ycor
-    ask patch-here [if area < 15 and hpop >= nbleedh and mpop >= nbleedm [let Shl n-values Sh [1]
-        ;show [nbleedh] of myself
-        let Ehl n-values Eh [2]
-        let Ihl n-values Ih [3]
-        let Rhl n-values Rh [4]
-        let Sml n-values Sm [1]
-        let Eml n-values Em [2]
-        let Iml n-values Im [3]
-        let hlist (sentence Shl Ehl Ihl Rhl)
-        let mlist (sentence Sml Eml Iml)
-        set hlist n-of nbleedh hlist
-        set mlist n-of nbleedm mlist
-        set Shx filter [? = 1] hlist
-        set Shx length Shx
-        set Ehx filter [? = 2] hlist
-        set Ehx length Ehx
-        set Ihx filter [? = 3] hlist
-        set Ihx length Ihx
-        set Rhx filter [? = 4] hlist
-        set Rhx length Rhx
-        set Smx filter [? = 1] mlist
-        set Smx length Smx
-        set Emx filter [? = 2] mlist
-        set Emx length Emx
-        set Imx filter [? = 3] mlist
-        set Imx length Imx
-        set Sh Sh + Shb - Shx
-        set Eh Eh + Ehb - Ehx
-        set Ih Ih + Ihb - Ihx
-        set Rh Rh + Rhb - Rhx
-        set Sm Sm + Smb - Smx
-        set Em Em + Emb - Emx
-        set Im Im + Imb - Imx
-        set swap 1]]
-      set xcor 0
-      set ycor 0]
+  ask patches [if (hpop + mpop > 0) and area < 15 [set Shb binom (Sh) (pbleedh)
+      set Ehb binom (Eh) (pbleedh)
+      set Ihb binom (Ih) (pbleedh)
+      set Rhb binom (Rh) (pbleedh)
+      set Smb binom (Sm) (pbleedm)
+      set Emb binom (Em) (pbleedm)
+      set Imb binom (Im) (pbleedm)
+      set nbleedh (Shb + Ehb + Ihb + Rhb)
+      ;set nbleedm (Smb + Emb + Imb)
+      let swap 0
+      let a 0
+      let pat 0
+      while [a = 0] [set pat patch-at-heading-and-distance (random 360) (random-exponential (ln(2)))
+        if pat != nobody [set a 1]]
+      ask pat [if area < 15 and hpop >= nbleedh [let Shl n-values Sh [1]
+          let Ehl n-values Eh [2]
+          let Ihl n-values Ih [3]
+          let Rhl n-values Rh [4]
+          ;let Sml n-values Sm [1]
+          ;let Eml n-values Em [2]
+          ;let Iml n-values Im [3]
+          let hlist (sentence Shl Ehl Ihl Rhl)
+          ;let mlist (sentence Sml Eml Iml)
+          set hlist n-of nbleedh hlist
+          ;set mlist n-of nbleedm mlist
+          set Shx filter [? = 1] hlist
+          set Shx length Shx
+          set Ehx filter [? = 2] hlist
+          set Ehx length Ehx
+          set Ihx filter [? = 3] hlist
+          set Ihx length Ihx
+          set Rhx filter [? = 4] hlist
+          set Rhx length Rhx
+          ;set Smx filter [? = 1] mlist
+          ;set Smx length Smx
+          ;set Emx filter [? = 2] mlist
+          ;set Emx length Emx
+          ;set Imx filter [? = 3] mlist
+          ;set Imx length Imx
+          set Sh Sh + Shb - Shx
+          set Eh Eh + Ehb - Ehx
+          set Ih Ih + Ihb - Ihx
+          set Rh Rh + Rhb - Rhx
+          set Sm Sm + Smb
+          set Em Em + Emb
+          set Im Im + Imb
+          set swap 1]]
     if swap = 1 [set Sh Sh - Shb + Shx
       set Eh Eh - Ehb + Ehx
       set Ih Ih - Ihb + Ihx
       set Rh Rh - Rhb + Rhx
-      set Sm Sm - Smb + Smx
-      set Em Em - Emb + Emx
-      set Im Im - Imb + Imx]]]
+      set Sm Sm - Smb
+      set Em Em - Emb
+      set Im Im - Imb]]]
 end
 
 to-report poisson [lam]
@@ -172,8 +261,8 @@ GRAPHICS-WINDOW
 157
 0
 217
-0
-0
+1
+1
 1
 ticks
 30.0
@@ -202,7 +291,7 @@ SWITCH
 192
 vegetation
 vegetation
-1
+0
 1
 -1000
 
@@ -215,7 +304,7 @@ pbleedh
 pbleedh
 0
 0.2
-0.049
+0.2
 0.001
 1
 NIL
@@ -230,7 +319,7 @@ pbleedm
 pbleedm
 0
 0.2
-0.036
+0.049
 0.001
 1
 NIL
@@ -262,7 +351,7 @@ Bh
 Bh
 0
 1
-0.05
+0.102
 0.001
 1
 NIL
@@ -277,7 +366,7 @@ Ah
 Ah
 0
 1
-0.05
+1
 0.001
 1
 NIL
@@ -307,7 +396,7 @@ Bm
 Bm
 0
 1
-0.05
+0.102
 0.001
 1
 NIL
@@ -322,7 +411,7 @@ Am
 Am
 0
 1
-0.05
+1
 0.001
 1
 NIL
@@ -342,6 +431,26 @@ mosdeath
 1
 NIL
 HORIZONTAL
+
+PLOT
+628
+10
+1257
+490
+plot 1
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot Shg"
+"pen-1" 1.0 0 -7500403 true "" "plot Ehg"
+"pen-2" 1.0 0 -2674135 true "" "plot Ihg"
 
 @#$#@#$#@
 ## WHAT IS IT?
